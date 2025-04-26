@@ -16,13 +16,32 @@ export default function KrakenNowPlaying({
   const [nowPlaying, setNowPlaying] = useState<CurrentlyPlaying | null>(nowPlayingInitial);
   const imgRef = useRef<HTMLImageElement>(null);
 
+  // 自動偵測歌曲改變
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch("/api/now-playing");
+        if (!res.ok) throw new Error("Failed to fetch now playing data");
+        const data = await res.json();
+
+        // 判斷是不是不同首歌才 setNowPlaying
+        if (data?.item?.id !== nowPlaying?.item?.id) {
+          setNowPlaying(data);
+        }
+      } catch (error) {
+        console.error("Auto refresh error:", error);
+      }
+    }, 3000); // 3秒
+
+    return () => clearInterval(interval);
+  }, [nowPlaying]);
+
+  // 抓封面顏色
   useEffect(() => {
     if (!nowPlaying?.item) return;
-
     if (nowPlaying.item.type !== "track") return;
 
     const track = nowPlaying.item as Track;
-
     if (!track.album?.images?.[0]?.url) return;
 
     const img = new Image();
@@ -38,22 +57,6 @@ export default function KrakenNowPlaying({
       }
     };
   }, [nowPlaying]);
-
-  // 🔥 每3秒自動重新抓一次 currently playing
-  useEffect(() => {
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch("/api/now-playing");
-        if (!res.ok) throw new Error("Failed to fetch now playing data");
-        const data = await res.json();
-        setNowPlaying(data);
-      } catch (error) {
-        console.error("Auto refresh error:", error);
-      }
-    }, 3000); // 3000毫秒 = 3秒
-
-    return () => clearInterval(interval); // 清除interval
-  }, []);
 
   if (!nowPlaying?.item || nowPlaying.item.type !== "track") {
     return <div style={{ color: "white" }}>No music is currently playing</div>;
@@ -83,14 +86,14 @@ export default function KrakenNowPlaying({
         src={track.album.images[0].url}
         alt="Album Cover"
         style={{
-          width: "250px",
-          height: "250px",
+          width: "30vw",        // 小改：封面寬度是螢幕寬的30%
+          height: "30vw",       // 高度一樣
+          maxWidth: "300px",    // 但最多300px
+          maxHeight: "300px",
           borderRadius: "16px",
           marginBottom: "24px",
           objectFit: "cover",
           boxShadow: "0 4px 20px rgba(0,0,0,0.5)",
-          maxWidth: "90%",
-          maxHeight: "90%",
         }}
       />
       <h1
@@ -125,8 +128,10 @@ export default function KrakenNowPlaying({
             padding: 0.5rem;
           }
           img {
-            width: 180px;
-            height: 180px;
+            width: 50vw;
+            height: 50vw;
+            max-width: 180px;
+            max-height: 180px;
             margin-bottom: 12px;
             border-radius: 12px;
           }
@@ -142,4 +147,3 @@ export default function KrakenNowPlaying({
     </div>
   );
 }
-
