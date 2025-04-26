@@ -18,12 +18,16 @@ export default function KrakenNowPlaying({
 
   useEffect(() => {
     if (!nowPlaying?.item) return;
-if (!("album" in nowPlaying.item)) return;
-if (!nowPlaying.item.album?.images?.[0]?.url) return;
+
+    // 確認是 Track 才處理
+    if (nowPlaying.item.type !== "track") return;
+
+    const track = nowPlaying.item;
+    if (!track.album?.images?.[0]?.url) return;
 
     const img = new Image();
     img.crossOrigin = "Anonymous";
-    img.src = nowPlaying.item.album.images[0].url;
+    img.src = track.album.images[0].url;
     img.onload = () => {
       try {
         const colorThief = new ColorThief();
@@ -35,11 +39,12 @@ if (!nowPlaying.item.album?.images?.[0]?.url) return;
     };
   }, [nowPlaying]);
 
-  if (!nowPlaying || !nowPlaying.item) {
+  if (!nowPlaying?.item || nowPlaying.item.type !== "track") {
     return <div style={{ color: "white" }}>No music is currently playing</div>;
   }
 
-  const { album, name, artists } = nowPlaying.item;
+  const track = nowPlaying.item;
+  const { album, name, artists } = track;
 
   return (
     <div
@@ -98,7 +103,7 @@ if (!nowPlaying.item.album?.images?.[0]?.url) return;
         {artists.map((artist) => artist.name).join(", ")}
       </p>
 
-      {/* 小螢幕時特別縮小 */}
+      {/* 小螢幕時縮小版 */}
       <style jsx>{`
         @media (max-width: 400px) {
           div {
