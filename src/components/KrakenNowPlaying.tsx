@@ -19,10 +19,9 @@ export default function KrakenNowPlaying({
   useEffect(() => {
     if (!nowPlaying?.item) return;
 
-    // 這裡先判斷 item 是不是 "track"
     if (nowPlaying.item.type !== "track") return;
 
-    const track = nowPlaying.item as Track; // 強制斷言為 Track
+    const track = nowPlaying.item as Track;
 
     if (!track.album?.images?.[0]?.url) return;
 
@@ -39,6 +38,22 @@ export default function KrakenNowPlaying({
       }
     };
   }, [nowPlaying]);
+
+  // 🔥 每3秒自動重新抓一次 currently playing
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch("/api/now-playing");
+        if (!res.ok) throw new Error("Failed to fetch now playing data");
+        const data = await res.json();
+        setNowPlaying(data);
+      } catch (error) {
+        console.error("Auto refresh error:", error);
+      }
+    }, 3000); // 3000毫秒 = 3秒
+
+    return () => clearInterval(interval); // 清除interval
+  }, []);
 
   if (!nowPlaying?.item || nowPlaying.item.type !== "track") {
     return <div style={{ color: "white" }}>No music is currently playing</div>;
