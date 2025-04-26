@@ -1,153 +1,77 @@
+import { useEffect, useRef, useState } from "react";
 import { Session } from "next-auth";
-import { useRef, useState, useEffect } from "react";
-import { CurrentlyPlaying, Episode, Track as TrackType } from "spotify-types";
-import Track from "@/components/Track";
-import Podcast from "@/components/Podcast";
-import { averageColor, isPodcast, isTrack } from "@/lib/utils";
-import { css } from "@emotion/css";
+import { CurrentlyPlaying } from "spotify-types";
+import ColorThief from "colorthief";
 
-const stylesFn = (backgroundColor: string) => {
-  return {
-    background: css`
-      position: absolute;
-      left: 0;
-      right: 0;
-      top: 0;
-      bottom: 0;
-      z-index: inherit;
-      background-color: ${backgroundColor};
-      background-size: cover;
-      background-position: center center;
-      filter: blur(20px);
-      transform: scale(1.2);
-      // transition: background ease 2s; disabled for now
-    `,
-
-    message: css`
-      color: white;
-      font-size: 2rem;
-      text-align: center;
-      padding: 0 10vw;
-    `,
-
-    spotifyLogo: css`
-      position: absolute;
-      top: 50px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 6em;
-      opacity: .6;
-    `,
-  };
-};
-
-const getNowPlaying: () => Promise<CurrentlyPlaying> = async () => {
-  try {
-    const res = await fetch("/api/playing");
-    const json = await res.json();
-    return { ...json, status: res.status };
-  } catch (e) {
-    throw new Error("Unable to retrieve album art");
-  }
-};
-
-const KrakenNowPlaying: React.FC<{
-  nowPlayingInitial: CurrentlyPlaying | null;
+export default function KrakenNowPlaying({
+  session,
+  nowPlayingInitial,
+  viewstate,
+}: {
   session: Session | null;
+  nowPlayingInitial: CurrentlyPlaying | null;
   viewstate: number;
-}> = ({ nowPlayingInitial, session, viewstate }) => {
-  const [intervalId, setIntervalId] = useState<NodeJS.Timer | null>(null);
-  const [showMessage, setShowMessage] = useState<string>("");
-  const [nowPlaying, setNowPlaying] = useState<TrackType | Episode | null>(
-    null
-  );
-  const imageRef = useRef<HTMLImageElement>(null);
-  const [backgroundColor, setBackgroundColor] = useState<string>("black");
-  const styles = stylesFn(backgroundColor);
+}) {
+  const [bgColor, setBgColor] = useState<string>("#000000");
+  const [nowPlaying, setNowPlaying] = useState<CurrentlyPlaying | null>(nowPlayingInitial);
+  const imgRef = useRef<HTMLImageElement>(null);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      if (!imageRef.current) {
-        return;
-      }
-      averageColor(imageRef.current, 1)
-        .then((color) => {
-          setBackgroundColor(color);
-        })
-        .catch((err) => {
-          console.error(err);
-        });
-    }
-  });
+    if (!nowPlaying?.item?.album?.images?.[0]?.url) return;
 
-  useEffect(() => {
-    if (!nowPlayingInitial?.item) {
-      setShowMessage("Please play a track to start the visualization.");
-    }
-    setNowPlaying(nowPlayingInitial?.item || null);
-  }, [nowPlayingInitial]);
-
-  useEffect(() => {
-    const updateNowPlaying = async () => {
+    const img = new Image();
+    img.crossOrigin = "Anonymous";
+    img.src = nowPlaying.item.album.images[0].url;
+    img.onload = () => {
       try {
-        if (session) {
-          const nowPlaying = await getNowPlaying();
-          if (nowPlaying.item) {
-            setNowPlaying(nowPlaying.item);
-            setShowMessage("");
-          } else {
-            setNowPlaying(null);
-            setShowMessage("Please play a track to start the visualization.");
-            return;
-          }
-        } else {
-          setNowPlaying(null);
-          setShowMessage('Please click "Configure" in NZXT CAM to continue');
-        }
-      } catch (e) {
-        setShowMessage("Unable to retrieve album art.");
+        const colorThief = new ColorThief();
+        const color = colorThief.getColor(img);
+        setBgColor(`rgb(${color[0]}, ${color[1]}, ${color[2]})`);
+      } catch (error) {
+        console.error("ColorThief error:", error);
       }
     };
+  }, [nowPlaying]);
 
-    if (!intervalId) {
-      const interval = setInterval(() => {
-        updateNowPlaying();
-      }, 5000);
+  if (!nowPlaying || !nowPlaying.item) {
+    return <div style={{ color: "white" }}>No music is currently playing</div>;
+  }
 
-      setIntervalId(interval);
-    }
-    return () => {
-      if (intervalId) clearInterval(intervalId);
-    };
-  }, [session, intervalId]);
+  const { album, name, artists } = nowPlaying.item;
 
   return (
-    <>
-      {nowPlaying && isTrack(nowPlaying) && (
-        <Track
-          nowPlaying={nowPlaying}
-          imageRef={imageRef}
-          viewstate={viewstate}
-        />
-      )}
-      {nowPlaying && isPodcast(nowPlaying) && (
-        <Podcast
-          nowPlaying={nowPlaying}
-          imageRef={imageRef}
-          viewstate={viewstate}
-        />
-      )}
-      {nowPlaying && <div className={styles.background} />}
-      {showMessage && !nowPlaying && (
-        <p className={styles.message}>{showMessage}</p>
-      )}
+    <div
+      style={{
+        background: bgColor,
+        height: "100vh",
+        width: "100vw",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        alignItems: "center",
+        color: "white",
+        fontFamily: "'Poppins', sans-serif",
+        textAlign: "center",
+        transition: "background 0.5s ease",
+      }}
+    >
       <img
-        className={styles.spotifyLogo}
-        src="/spotify-small.png"
-        alt="Spotify Logo"
+        ref={imgRef}
+        src={album.images[0].url}
+        alt="Album Cover"
+        style={{
+          width: "250px",
+          height: "250px",
+          borderRadius: "16px",
+          marginBottom: "24px",
+          objectFit: "cover",
+          boxShadow: "0 4px 20px rgba(0,0,0,0.5)",
+        }}
       />
-    </>
+      <h1 style={{ fontSize: "28px", marginBottom: "8px" }}>{name}</h1>
+      <p style={{ fontSize: "18px", opacity: 0.8 }}>
+        {artists.map((artist) => artist.name).join(", ")}
+      </p>
+    </div>
   );
-};
-
-export default KrakenNowPlaying;
+}
