@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Session } from "next-auth";
-import { CurrentlyPlaying } from "spotify-types";
+import { CurrentlyPlaying, Track } from "spotify-types";
 import ColorThief from "colorthief";
 
 export default function KrakenNowPlaying({
@@ -19,10 +19,11 @@ export default function KrakenNowPlaying({
   useEffect(() => {
     if (!nowPlaying?.item) return;
 
-    // 確認是 Track 才處理
+    // 這裡先判斷 item 是不是 "track"
     if (nowPlaying.item.type !== "track") return;
 
-    const track = nowPlaying.item;
+    const track = nowPlaying.item as Track; // 強制斷言為 Track
+
     if (!track.album?.images?.[0]?.url) return;
 
     const img = new Image();
@@ -43,8 +44,7 @@ export default function KrakenNowPlaying({
     return <div style={{ color: "white" }}>No music is currently playing</div>;
   }
 
-  const track = nowPlaying.item;
-  const { album, name, artists } = track;
+  const track = nowPlaying.item as Track;
 
   return (
     <div
@@ -65,7 +65,7 @@ export default function KrakenNowPlaying({
     >
       <img
         ref={imgRef}
-        src={album.images[0].url}
+        src={track.album.images[0].url}
         alt="Album Cover"
         style={{
           width: "250px",
@@ -88,7 +88,7 @@ export default function KrakenNowPlaying({
           whiteSpace: "nowrap",
         }}
       >
-        {name}
+        {track.name}
       </h1>
       <p
         style={{
@@ -100,10 +100,10 @@ export default function KrakenNowPlaying({
           whiteSpace: "nowrap",
         }}
       >
-        {artists.map((artist) => artist.name).join(", ")}
+        {track.artists.map((artist) => artist.name).join(", ")}
       </p>
 
-      {/* 小螢幕時縮小版 */}
+      {/* 手機版縮小 */}
       <style jsx>{`
         @media (max-width: 400px) {
           div {
