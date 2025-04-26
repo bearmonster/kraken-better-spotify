@@ -13,35 +13,38 @@ export default function KrakenNowPlaying({
   viewstate: number;
 }) {
   const [bgColor, setBgColor] = useState<string>("#000000");
+  const [textColor, setTextColor] = useState<string>("#ffffff");
   const [nowPlaying, setNowPlaying] = useState<CurrentlyPlaying | null>(nowPlayingInitial);
   const imgRef = useRef<HTMLImageElement>(null);
 
-  // 自動偵測歌曲改變
+  // 🔥 每3秒抓一次最新歌曲
   useEffect(() => {
-    const interval = setInterval(async () => {
+    const fetchNowPlaying = async () => {
       try {
         const res = await fetch("/api/now-playing");
-        if (!res.ok) throw new Error("Failed to fetch now playing data");
         const data = await res.json();
-
-        // 判斷是不是不同首歌才 setNowPlaying
-        if (data?.item?.id !== nowPlaying?.item?.id) {
+        if (data && data.item) {
           setNowPlaying(data);
         }
       } catch (error) {
-        console.error("Auto refresh error:", error);
+        console.error("Error fetching now playing:", error);
       }
-    }, 3000); // 3秒
+    };
+
+    const interval = setInterval(() => {
+      fetchNowPlaying();
+    }, 3000);
 
     return () => clearInterval(interval);
-  }, [nowPlaying]);
+  }, []);
 
-  // 抓封面顏色
+  // 🎨 封面色彩分析 + 字色判斷
   useEffect(() => {
     if (!nowPlaying?.item) return;
     if (nowPlaying.item.type !== "track") return;
 
     const track = nowPlaying.item as Track;
+
     if (!track.album?.images?.[0]?.url) return;
 
     const img = new Image();
@@ -52,6 +55,14 @@ export default function KrakenNowPlaying({
         const colorThief = new ColorThief();
         const color = colorThief.getColor(img);
         setBgColor(`rgb(${color[0]}, ${color[1]}, ${color[2]})`);
+
+        // 判斷明亮度
+        const luminance = (0.299 * color[0] + 0.587 * color[1] + 0.114 * color[2]) / 255;
+        if (luminance > 0.7) {
+          setTextColor("#000000"); // 背景太亮 → 黑字
+        } else {
+          setTextColor("#ffffff"); // 背景偏暗 → 白字
+        }
       } catch (error) {
         console.error("ColorThief error:", error);
       }
@@ -74,10 +85,10 @@ export default function KrakenNowPlaying({
         flexDirection: "column",
         justifyContent: "center",
         alignItems: "center",
-        color: "white",
+        color: textColor,
         fontFamily: "'Poppins', sans-serif",
         textAlign: "center",
-        transition: "background 0.5s ease",
+        transition: "background 0.5s ease, color 0.5s ease",
         padding: "1rem",
       }}
     >
@@ -86,14 +97,15 @@ export default function KrakenNowPlaying({
         src={track.album.images[0].url}
         alt="Album Cover"
         style={{
-          width: "30vw",        // 小改：封面寬度是螢幕寬的30%
-          height: "30vw",       // 高度一樣
-          maxWidth: "300px",    // 但最多300px
-          maxHeight: "300px",
+          width: "250px",
+          height: "250px",
           borderRadius: "16px",
           marginBottom: "24px",
           objectFit: "cover",
           boxShadow: "0 4px 20px rgba(0,0,0,0.5)",
+          maxWidth: "90%",
+          maxHeight: "90%",
+          animation: "spin 15s linear infinite", // 🌟 加旋轉動畫
         }}
       />
       <h1
@@ -121,17 +133,23 @@ export default function KrakenNowPlaying({
         {track.artists.map((artist) => artist.name).join(", ")}
       </p>
 
-      {/* 手機版縮小 */}
+      {/* 🎨 手機版適配 + 旋轉動畫CSS */}
       <style jsx>{`
+        @keyframes spin {
+          0% {
+            transform: rotate(0deg);
+          }
+          100% {
+            transform: rotate(360deg);
+          }
+        }
         @media (max-width: 400px) {
           div {
             padding: 0.5rem;
           }
           img {
-            width: 50vw;
-            height: 50vw;
-            max-width: 180px;
-            max-height: 180px;
+            width: 180px;
+            height: 180px;
             margin-bottom: 12px;
             border-radius: 12px;
           }
@@ -147,3 +165,4 @@ export default function KrakenNowPlaying({
     </div>
   );
 }
+
