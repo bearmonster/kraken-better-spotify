@@ -17,7 +17,9 @@ export default function KrakenNowPlaying({
   const imgRef = useRef<HTMLImageElement>(null);
 
   useEffect(() => {
-    if (!nowPlaying?.item?.album?.images?.[0]?.url) return;
+    if (!nowPlaying?.item) return;
+if (!("album" in nowPlaying.item)) return;
+if (!nowPlaying.item.album?.images?.[0]?.url) return;
 
     const img = new Image();
     img.crossOrigin = "Anonymous";
