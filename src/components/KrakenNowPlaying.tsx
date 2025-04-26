@@ -1,118 +1,124 @@
-// components/KrakenNowPlaying.tsx
-import { Session } from "next-auth";
 import { useRef, useState, useEffect } from "react";
-import { CurrentlyPlaying, Episode, Track as TrackType } from "spotify-types";
-import Track from "@/components/Track";
-import Podcast from "@/components/Podcast";
-import { averageColor, isPodcast, isTrack } from "@/lib/utils";
+import { Session } from "next-auth";
+import { CurrentlyPlaying, Track as TrackType } from "spotify-types";
 import { css } from "@emotion/css";
+import ColorThief from "colorthief";
 
 const stylesFn = (backgroundColor: string) => ({
   background: css`
     position: absolute;
     inset: 0;
-    z-index: inherit;
     background-color: ${backgroundColor};
     background-size: cover;
     background-position: center center;
     filter: blur(20px);
     transform: scale(1.2);
   `,
-  message: css`
+  content: css`
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
     color: white;
-    font-size: 2rem;
     text-align: center;
-    padding: 0 10vw;
   `,
-  spotifyLogo: css`
-    position: absolute;
-    top: 50px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 6em;
-    opacity: 0.6;
+  albumImage: css`
+    width: 200px;
+    height: 200px;
+    border-radius: 16px;
+    margin-bottom: 20px;
+    object-fit: cover;
   `,
+  songTitle: css`
+    font-size: 24px;
+    font-weight: bold;
+    margin-bottom: 8px;
+  `,
+  artist: css`
+    font-size: 18px;
+    opacity: 0.8;
+  `
 });
 
-const getNowPlaying = async (): Promise<CurrentlyPlaying> => {
-  try {
-    const res = await fetch("/api/playing", { cache: "no-store" });
-    const json = await res.json();
-    return { ...json, status: res.status };
-  } catch {
-    throw new Error("Unable to retrieve album art");
-  }
-};
-
-const KrakenNowPlaying: React.FC<{
+const KrakenNowPlaying = ({
+  nowPlayingInitial,
+  session,
+  viewstate,
+}: {
   nowPlayingInitial: CurrentlyPlaying | null;
   session: Session | null;
   viewstate: number;
-}> = ({ nowPlayingInitial, session, viewstate }) => {
-  const [nowPlaying, setNowPlaying] = useState<TrackType | Episode | null>(null);
+}) => {
+  const [nowPlaying, setNowPlaying] = useState<TrackType | null>(
+    nowPlayingInitial?.item?.type === "track" ? (nowPlayingInitial.item as TrackType) : null
+  );
   const [backgroundColor, setBackgroundColor] = useState<string>("black");
-  const [showMessage, setShowMessage] = useState<string>("");
-  const imageRef = useRef<HTMLImageElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
   const styles = stylesFn(backgroundColor);
 
-  const updateNowPlaying = async () => {
+  const fetchNowPlaying = async () => {
     try {
-      if (session) {
-        const nowPlaying = await getNowPlaying();
-        if (nowPlaying.item) {
-          setNowPlaying(nowPlaying.item);
-          setShowMessage("");
-        } else {
-          setNowPlaying(null);
-          setShowMessage("請開始播放音樂來啟動視覺化效果！");
-        }
+      const res = await fetch("/api/playing");
+      const data = await res.json();
+      if (data.item?.type === "track") {
+        setNowPlaying(data.item);
       } else {
         setNowPlaying(null);
-        setShowMessage("請登入 Spotify 後開始使用！");
       }
-    } catch {
-      setShowMessage("無法取得音樂資訊！");
+    } catch (err) {
+      console.error("Failed to fetch now playing:", err);
     }
   };
 
   useEffect(() => {
-    if (nowPlayingInitial?.item) {
-      setNowPlaying(nowPlayingInitial.item);
-    } else {
-      setShowMessage("請開始播放音樂來啟動視覺化效果！");
-    }
-  }, [nowPlayingInitial]);
+    const interval = setInterval(() => {
+      fetchNowPlaying();
+    }, 3000);
 
-  useEffect(() => {
-    const interval = setInterval(updateNowPlaying, 5000);
     return () => clearInterval(interval);
-  }, [session]);
+  }, []);
 
   useEffect(() => {
-    if (imageRef.current) {
-      averageColor(imageRef.current, 1)
-        .then(setBackgroundColor)
-        .catch(console.error);
-    }
+    if (!imgRef.current) return;
+    const img = imgRef.current;
+    img.crossOrigin = "Anonymous";
+    img.onload = () => {
+      try {
+        const colorThief = new ColorThief();
+        const color = colorThief.getColor(img);
+        setBackgroundColor(`rgb(${color[0]}, ${color[1]}, ${color[2]})`);
+      } catch (err) {
+        console.error("ColorThief error:", err);
+      }
+    };
   }, [nowPlaying]);
+
+  if (!nowPlaying) {
+    return (
+      <div className={styles.content}>
+        <p>No music is currently playing</p>
+      </div>
+    );
+  }
 
   return (
     <>
-      {nowPlaying && isTrack(nowPlaying) && (
-        <Track nowPlaying={nowPlaying} imageRef={imageRef} viewstate={viewstate} />
-      )}
-      {nowPlaying && isPodcast(nowPlaying) && (
-        <Podcast nowPlaying={nowPlaying} imageRef={imageRef} viewstate={viewstate} />
-      )}
-      {nowPlaying && <div className={styles.background} />}
-      {!nowPlaying && showMessage && (
-        <p className={styles.message}>{showMessage}</p>
-      )}
-      <img
-        className={styles.spotifyLogo}
-        src="/spotify-small.png"
-        alt="Spotify Logo"
-      />
+      <div className={styles.background} />
+      <div className={styles.content}>
+        <img
+          ref={imgRef}
+          src={nowPlaying.album.images[0].url}
+          alt="Album Cover"
+          className={styles.albumImage}
+        />
+        <div className={styles.songTitle}>{nowPlaying.name}</div>
+        <div className={styles.artist}>
+          {nowPlaying.artists.map((artist) => artist.name).join(", ")}
+        </div>
+      </div>
     </>
   );
 };
