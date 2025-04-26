@@ -53,6 +53,7 @@ export default function KrakenNowPlaying({
         fontFamily: "'Poppins', sans-serif",
         textAlign: "center",
         transition: "background 0.5s ease",
+        padding: "1rem",
       }}
     >
       <img
@@ -66,12 +67,56 @@ export default function KrakenNowPlaying({
           marginBottom: "24px",
           objectFit: "cover",
           boxShadow: "0 4px 20px rgba(0,0,0,0.5)",
+          maxWidth: "90%",
+          maxHeight: "90%",
         }}
       />
-      <h1 style={{ fontSize: "28px", marginBottom: "8px" }}>{name}</h1>
-      <p style={{ fontSize: "18px", opacity: 0.8 }}>
+      <h1
+        style={{
+          fontSize: "28px",
+          marginBottom: "8px",
+          maxWidth: "90%",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {name}
+      </h1>
+      <p
+        style={{
+          fontSize: "18px",
+          opacity: 0.8,
+          maxWidth: "90%",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+        }}
+      >
         {artists.map((artist) => artist.name).join(", ")}
       </p>
+
+      {/* 小螢幕時特別縮小 */}
+      <style jsx>{`
+        @media (max-width: 400px) {
+          div {
+            padding: 0.5rem;
+          }
+          img {
+            width: 180px;
+            height: 180px;
+            margin-bottom: 12px;
+            border-radius: 12px;
+          }
+          h1 {
+            font-size: 20px;
+            margin-bottom: 6px;
+          }
+          p {
+            font-size: 14px;
+          }
+        }
+      `}</style>
     </div>
   );
 }
